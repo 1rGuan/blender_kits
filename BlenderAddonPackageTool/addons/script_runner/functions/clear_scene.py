@@ -3,8 +3,9 @@ import bpy
 
 def clear_animations():
     for obj in bpy.data.objects:
-        if obj.animation_data:
-            obj.animation_data_clear()
+        if obj.animation_data and obj.animation_data.action:
+            for data_path in ["location", "rotation_euler", "scale", "hide_viewport", "hide_render"]:
+                obj.keyframe_delete(data_path)
 
 
 def clean_up_scene():

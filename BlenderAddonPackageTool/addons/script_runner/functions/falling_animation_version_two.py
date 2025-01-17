@@ -1,5 +1,7 @@
 import bpy
 import re
+import random
+import mathutils
 from mathutils import Vector
 from addons.script_runner.functions.import_image import import_image
 from addons.script_runner.functions.clear_scene import clear_animations, clean_up_scene
@@ -13,7 +15,7 @@ def falling_animation_version_two():
 
     if diffusion_plane is None:
         diffusion_plane = import_image(
-            "F:\\mdl-browser-dev\\blender_kits\\assets\\250116\\diffusion_img.png"
+            "D:\\BlenderScript\\blender_kits\\assets\\250116\\diffusion_img.png"
         )
         diffusion_plane.name = "diffusion_image"
     floor = bpy.data.objects.get("floor_0")
@@ -33,15 +35,29 @@ def falling_animation_version_two():
         diffusion_plane.scale.x = floor_width / diffusion_plane.dimensions.x
         diffusion_plane.scale.y = floor_depth / diffusion_plane.dimensions.y
 
+    scene_bbx = bpy.data.objects.get("scene_bbx")
+    if scene_bbx is None:
+        scene_min, scene_max = calculate_scene_bounding_box()
+        scene_bbx = create_bounding_box_cube(scene_min, scene_max)
+    
+    diffusion_plane.location.z += scene_bbx.dimensions.z * 3 + diffusion_plane.dimensions.z
+
+
     # 获取所有匹配的对象
     root_objects = [
-        obj for obj in bpy.data.objects if obj.type == "MESH" and obj.parent is None
+        obj for obj in bpy.data.objects if obj.type == "MESH" and obj.parent is None and obj.name!="scene_bbx"
     ]
 
     frame_start = 0
     frame_end = 30
+    random_offset = random.randint(0, 20)
+    frame_start += random_offset
+    frame_end += random_offset
     for obj in root_objects:
         process_object_hierarchy(obj, frame_start, frame_end)
+    
+    scene_bbx.hide_viewport = True
+    scene_bbx.hide_render = True
 
 
 def process_object_hierarchy(obj, frame_start, frame_end):
@@ -50,6 +66,11 @@ def process_object_hierarchy(obj, frame_start, frame_end):
         for child in obj.children:
             process_object_hierarchy(child, frame_start, frame_end)
     else:
+        # 添加随机时间偏移
+        random_offset = random.randint(0, 15)
+        frame_start += random_offset+30
+        frame_end += random_offset+30
+
         raise_obj_bounding_box_to_plane(obj, frame_start, frame_end)
         fade_in(obj, (frame_start, frame_end))
 
@@ -79,12 +100,6 @@ def raise_obj_bounding_box_to_plane(obj, frame_start, frame_end):
                 keyframe.handle_right_type = "AUTO"
 
 
-def clear_animations():
-    for obj in bpy.data.objects:
-        if obj.animation_data:
-            obj.animation_data_clear()
-
-
 def if_match_name_pattern(obj):
     pattern = re.compile(r"^(wall|floor)_[0-9]+$")
 
@@ -92,3 +107,51 @@ def if_match_name_pattern(obj):
         return True
 
     return False
+
+def create_bounding_box_cube(min_corner, max_corner):
+    center = (min_corner + max_corner) / 2
+    size = max_corner - min_corner
+
+    bpy.ops.mesh.primitive_cube_add(size=2, location=center)
+    cube = bpy.context.object
+
+    cube.scale = size / 2
+    cube.name = "scene_bbx"
+
+    return cube
+
+def calculate_scene_bounding_box():
+    min_corner = mathutils.Vector((float("inf"), float("inf"), float("inf")))
+    max_corner = mathutils.Vector((float("-inf"), float("-inf"), float("-inf")))
+
+    for obj in bpy.context.scene.objects:
+        if obj.type in {"MESH", "CURVE", "SURFACE", "META", "FONT"}:
+            obj_min, obj_max = get_bounding_box(obj)
+            min_corner.x = min(min_corner.x, obj_min.x)
+            min_corner.y = min(min_corner.y, obj_min.y)
+            min_corner.z = min(min_corner.z, obj_min.z)
+            max_corner.x = max(max_corner.x, obj_max.x)
+            max_corner.y = max(max_corner.y, obj_max.y)
+            max_corner.z = max(max_corner.z, obj_max.z)
+
+    return min_corner, max_corner
+
+def get_bounding_box(obj):
+    bbox_corners = [
+        obj.matrix_world @ mathutils.Vector(corner) for corner in obj.bound_box
+    ]
+    min_corner = mathutils.Vector(
+        (
+            min([v.x for v in bbox_corners]),
+            min([v.y for v in bbox_corners]),
+            min([v.z for v in bbox_corners]),
+        )
+    )
+    max_corner = mathutils.Vector(
+        (
+            max([v.x for v in bbox_corners]),
+            max([v.y for v in bbox_corners]),
+            max([v.z for v in bbox_corners]),
+        )
+    )
+    return min_corner, max_corner
