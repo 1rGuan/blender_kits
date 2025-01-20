@@ -15,6 +15,7 @@ def fade_in(obj, keyframe):
             material = old_material.copy()
             slot.material = material
             material.blend_method = "BLEND"
+            material.surface_render_method = "DITHERED"
             nodes = material.node_tree.nodes
             links = material.node_tree.links
 

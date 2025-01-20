@@ -1,6 +1,7 @@
 import bpy
 import re
 import random
+import math
 import mathutils
 from mathutils import Vector
 from addons.script_runner.functions.import_image import import_image
@@ -9,6 +10,10 @@ from addons.script_runner.functions.fade_in import fade_in
 
 
 def falling_animation_version_two():
+    scene = bpy.context.scene
+    scene.render.resolution_x = 1080
+    scene.render.resolution_y = 1920
+    
     clear_animations()
     clean_up_scene()
     diffusion_plane = bpy.data.objects.get("diffusion_image")
@@ -38,9 +43,10 @@ def falling_animation_version_two():
     scene_bbx = bpy.data.objects.get("scene_bbx")
     if scene_bbx is None:
         scene_min, scene_max = calculate_scene_bounding_box()
-        scene_bbx = create_bounding_box_cube(scene_min, scene_max)
+        scene_bbx = create_bounding_box_cube("scene_bbx", scene_min, scene_max)
     
-    diffusion_plane.location.z += scene_bbx.dimensions.z * 3 + diffusion_plane.dimensions.z
+    # diffusion_plane.location.z += scene_bbx.dimensions.z * 3 + diffusion_plane.dimensions.x
+    diffusion_plane.location.z += scene_bbx.dimensions.z * 3.5
 
 
     # 获取所有匹配的对象
@@ -58,6 +64,23 @@ def falling_animation_version_two():
     
     scene_bbx.hide_viewport = True
     scene_bbx.hide_render = True
+    
+    scene_plane_bbx = bpy.data.objects.get("scene_plane_bbx")
+    if scene_plane_bbx is None:
+        scene_plane_min, scene_plane_max = calculate_scene_bounding_box()
+        scene_plane_bbx = create_bounding_box_cube("scene_plane_bbx", scene_plane_min, scene_plane_max)
+    else:
+        scene_plane_min, scene_plane_max = calculate_scene_bounding_box()
+    bpy.ops.object.camera_add(location=(0, 0, 0))
+    camera = bpy.context.object
+    camera.name = "rotating_camera"
+    
+    center = (scene_plane_min + scene_plane_max) / 2
+    camera_target_to_objects(camera, scene_plane_bbx, center)
+    scene_plane_bbx.hide_viewport = True
+    scene_plane_bbx.hide_render = True
+    
+
 
 
 def process_object_hierarchy(obj, frame_start, frame_end):
@@ -108,7 +131,7 @@ def if_match_name_pattern(obj):
 
     return False
 
-def create_bounding_box_cube(min_corner, max_corner):
+def create_bounding_box_cube(name, min_corner, max_corner):
     center = (min_corner + max_corner) / 2
     size = max_corner - min_corner
 
@@ -116,7 +139,7 @@ def create_bounding_box_cube(min_corner, max_corner):
     cube = bpy.context.object
 
     cube.scale = size / 2
-    cube.name = "scene_bbx"
+    cube.name = name
 
     return cube
 
@@ -155,3 +178,43 @@ def get_bounding_box(obj):
         )
     )
     return min_corner, max_corner
+
+
+def adjust_camera_to_fit_object(camera, obj):
+    bbox_corners = [
+        obj.matrix_world @ mathutils.Vector(corner) for corner in obj.bound_box
+    ]
+
+    bbox_center = sum(bbox_corners, mathutils.Vector()) / 8
+    bbox_size = max((corner - bbox_center).length for corner in bbox_corners)
+
+    # 设置相机位置
+    camera_distance = bbox_size / math.tan(camera.data.angle / 2)
+    camera_vector = camera.location - bbox_center
+    camera_vector.normalize()
+    camera.location = (
+        bbox_center + camera_vector * camera_distance * 1.5
+    )  # 稍微往后移动一点
+
+    # 让相机看向物体中心
+    direction = bbox_center - camera.location
+    rot_quat = direction.to_track_quat("-Z", "Y")
+    camera.rotation_euler = rot_quat.to_euler()
+    
+def camera_target_to_objects(camera, target_obj, center):
+    adjust_camera_to_fit_object(camera, target_obj)
+
+    camera_distance = (camera.location - center).length
+
+    # bpy.ops.curve.primitive_bezier_circle_add(radius=camera_distance, location=center)
+    # path = bpy.context.object
+
+    # constraint = camera.constraints.new(type="FOLLOW_PATH")
+    # constraint.target = path
+    # constraint.use_curve_follow = True
+
+    constraint = camera.constraints.new(type="TRACK_TO")
+    constraint.target = target_obj
+    constraint.track_axis = "TRACK_NEGATIVE_Z"
+    constraint.up_axis = "UP_Y"
+    return camera

@@ -61,19 +61,15 @@ def create_camera_and_path(target_obj, center, radius):
 
     adjust_camera_to_fit_object(camera, target_obj)
 
-    # 计算相机到包围盒中心的距离
     camera_distance = (camera.location - center).length
 
-    # 创建曲线并设置其中心和半径
     bpy.ops.curve.primitive_bezier_circle_add(radius=camera_distance, location=center)
     path = bpy.context.object
 
-    # 为相机添加 FOLLOW_PATH 约束
     constraint = camera.constraints.new(type="FOLLOW_PATH")
     constraint.target = path
     constraint.use_curve_follow = True
 
-    # 为相机添加 TRACK_TO 约束
     constraint = camera.constraints.new(type="TRACK_TO")
     constraint.target = target_obj
     constraint.track_axis = "TRACK_NEGATIVE_Z"

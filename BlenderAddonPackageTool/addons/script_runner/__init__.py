@@ -9,7 +9,7 @@ from addons.script_runner.properties import ScriptRunnerProperties
 from addons.script_runner.panels.ScriptRunnerPanel import PT_ScriptRunner
 from addons.script_runner.operators.FallingAnimationOperator import OT_FallingAnimation
 from addons.script_runner.operators.FallingAnimationOperatorV2 import OT_FallingAnimationVersionTwo
-# from addons.script_runner.operators.FallingAnimationOperator import OT_FallingAnimation
+from addons.script_runner.operators.FadeInByName import OT_FadeInByName
 
 # Add-on info
 bl_info = {
@@ -33,6 +33,7 @@ CLASSES = [
     OT_FallingAnimation,
     OT_FallingAnimationVersionTwo,
     PT_ScriptRunner,
+    OT_FadeInByName
 ]
 
 dir_name_ = Path((os.path.dirname(__file__)))
